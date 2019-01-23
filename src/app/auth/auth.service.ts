@@ -21,26 +21,34 @@ export class AuthService {
   private itemDoc: AngularFirestoreDocument<User>;
   private userSubcription: Subscription = new Subscription();
   item: Observable<User>;
+  private user: User;
   constructor(private afAuth: AngularFireAuth,
     private router: Router,
     private afDB: AngularFirestore,
     private store: Store<AppState>) {
-    this.itemsCollection = afDB.collection('users');
+    //this.itemsCollection = afDB.collection('users');
 
+  }
+
+  getUser() {
+    return { ...this.user };
   }
 
   initAuthListener() {
     this.afAuth.authState.subscribe((fbUser: firebase.User) => {
       if (fbUser) {
 
-        this.itemDoc = this.itemsCollection.doc<User>(`${fbUser.uid}`);
-        this.item = this.itemDoc.valueChanges();
-        this.userSubcription = this.item.subscribe((aux: any) => {
-          const newUser = new User(aux);
-          this.store.dispatch(new SetUserAction(newUser));
-          console.info(newUser);
-        });
+        this.userSubcription = this.afDB.doc(`${fbUser.uid}/usuario`).valueChanges()
+          .subscribe((usuarioObj: any) => {
+
+            const newUser = new User(usuarioObj);
+            this.store.dispatch(new SetUserAction(newUser));
+            this.user = newUser;
+
+          });
+
       } else {
+        this.user = null;
         this.userSubcription.unsubscribe();
       }
     });
@@ -70,7 +78,16 @@ export class AuthService {
 
         //Guardo en firebase
         //this.itemsCollection.add(user).then(() => this.router.navigate(['/']));
-        this.itemsCollection.doc(user.uid).set(user).then(() => this.router.navigate(['/']));
+        //this.itemsCollection.doc(user.uid).set(user).then(() => this.router.navigate(['/']));
+
+        this.afDB.doc(`${user.uid}/usuario`)
+          .set(user)
+          .then(() => {
+
+            this.router.navigate(['/']);
+            this.store.dispatch(new DesactivarLoadingAction());
+
+          });
         this.store.dispatch(new DesactivarLoadingAction());
 
       }).catch(error => {
